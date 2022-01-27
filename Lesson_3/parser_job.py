@@ -1,11 +1,8 @@
-from pprint import pprint
-
 import pymongo
 import requests
 from bs4 import BeautifulSoup
 from pymongo import MongoClient, errors
 import pandas as pd
-import json
 
 
 def get_compensations(compensation):
@@ -38,8 +35,7 @@ def get_compensations(compensation):
     return min_val, max_val, currency
 
 
-def get_jobs_hh(vacancy_name: str, collection) -> list:
-    hh = []
+def get_jobs_hh(vacancy_name: str, collection):
     i = 0
 
     while True:
@@ -72,13 +68,10 @@ def get_jobs_hh(vacancy_name: str, collection) -> list:
             vacancy_data['compensation']['min'], vacancy_data['compensation']['max'], vacancy_data['compensation'][
                 'currency'] = get_compensations(compensation)
 
-            hh.append(vacancy_data)
-
-            # collection.insert_one(vacancy_data)
             try:
                 collection.insert_one(vacancy_data)
             except errors.DuplicateKeyError:
-                print('Вакансия уже существует')
+                pass
 
         btn_next = dom.find('a', {'data-qa': 'pager-next'})
 
@@ -86,12 +79,9 @@ def get_jobs_hh(vacancy_name: str, collection) -> list:
             i += 1
         else:
             break
-    return hh
 
 
-def get_jobs_superjob(vacancy_name: str, collection) -> list:
-    # https: // russia.superjob.ru / vacancy / search /?keywords = python & page = 1
-    superjob = []
+def get_jobs_superjob(vacancy_name: str, collection):
     i = 1
 
     while True:
@@ -117,12 +107,10 @@ def get_jobs_superjob(vacancy_name: str, collection) -> list:
             vacancy_data['compensation']['min'], vacancy_data['compensation']['max'], vacancy_data['compensation'][
                 'currency'] = get_compensations(compensation)
 
-            superjob.append(vacancy_data)
-
             try:
                 collection.insert_one(vacancy_data)
             except errors.DuplicateKeyError:
-                print('Вакансия уже существует')
+                pass
 
         btn_next = dom.find('a', {'rel': 'next'})
         if btn_next:
@@ -130,34 +118,26 @@ def get_jobs_superjob(vacancy_name: str, collection) -> list:
         else:
             break
 
-    return superjob
+
+def find_compensation(compensation, collection):
+    result = [item for item in collection.find({'$or': [
+                                                    {'compensation.min': {'$gte': compensation}},
+                                                    {'compensation.max': {'$gte': compensation}}
+                                                ]})]
+    return result
 
 
 if __name__ == '__main__':
     client = MongoClient('127.0.0.1', 27017)
     db = client['job']
     vac_collect = db.vacancy
-    # vac_collect.drop()
-    # vac_collect.create_index([('url', pymongo.DESCENDING)], name='url_index', unique=True)
-    # vac_collect.delete_many({})
+    vac_collect.create_index([('url', pymongo.DESCENDING)], name='url_index', unique=True)
     vacancy = 'django'
-    # get_jobs_hh(vacancy, vac_collect)
-    # get_jobs_superjob(vacancy, vac_collect)
+    get_jobs_hh(vacancy, vac_collect)
+    get_jobs_superjob(vacancy, vac_collect)
 
-    # jobs = []
-    # hh_jobs = get_jobs_hh(vacancy)
-    # jobs.extend(hh_jobs)
-    # sj_jobs = get_jobs_superjob(vacancy)
-    # jobs.extend(sj_jobs)
-    #
-    # with open('jobs.json', 'w', encoding='utf-8') as f:
-    #     json.dump(jobs, f, indent=4)
-    #
-    # with open('jobs.json', 'r', encoding='utf-8') as f:
-    #     json_data = json.load(fp=f)
-    #
-    # pd.options.display.max_rows = 200
-    # pd.options.display.max_columns = 5
-    # pd.options.display.width = 2000
-    # df = pd.DataFrame(data=json_data, columns=('name', 'compensation', 'site', 'url'))
-    # print(df)
+    pd.options.display.max_rows = 200
+    pd.options.display.max_columns = 5
+    pd.options.display.width = 2000
+    df = pd.DataFrame(data=find_compensation(250000, vac_collect), columns=('name', 'compensation', 'site', 'url'))
+    print(df)
