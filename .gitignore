@@ -1,2 +1,5 @@
 venv
 .vscode
+.idea
+/Lesson_5/chromedriver
+/Lesson_5/chromedriver.exe
